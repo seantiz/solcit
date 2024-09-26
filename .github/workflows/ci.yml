@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+    PUBLIC_NODE_ENV: ${{ vars.PUBLIC_NODE_ENV }},
+    PUBLIC_SAVED_CONFIG: ${{ vars.PUBLIC_SAVED_CONFIG }},
+    PUBLIC_SAVED_CV_DETAILS: ${{ vars.PUBLIC_SAVED_CV_DETAILS }},
+    PUBLIC_SAVED_JOBDESC: ${{ vars.PUBLIC_SAVED_JOBDESC }},
+    PUBLIC_FILES_PATH: ${{ secrets.PUBLIC_FILES_PATH }}
+
 jobs:
   test-python:
     runs-on: ubuntu-latest
@@ -62,10 +69,3 @@ jobs:
       working-directory: ./desktop
       run: npm install && npm run build
     - uses: tauri-apps/tauri-action@v0
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }},
-        PUBLIC_FILES_PATH: ${{ secrets.PUBLIC_FILES_PATH }},
-        PUBLIC_SAVED_JOBDESC: ${{ secrets.PUBLIC_SAVED_JOBDESC }},
-        PUBLIC_SAVED_CONFIG: ${{ secrets.PUBLIC_SAVED_CONFIG }},
-        PUBLIC_SAVED_CVDETAILS: ${{ secrets.PUBLIC_SAVED_CVDETAILS }},
-        PUBLIC_NODE_ENV: ${{ secrets.PUBLIC_NODE_ENV }},
