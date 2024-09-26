@@ -6,8 +6,6 @@
 
 	import { View, Indeed, Jooble, BTA, StreamingAnimation } from '$components'
 
-	import { PUBLIC_FILES_PATH, PUBLIC_SAVED_JOBDESC } from '$env/static/public'
-
 	import { fade, fly } from 'svelte/transition'
 	import { spring } from 'svelte/motion'
 	import { writable, get } from 'svelte/store'
