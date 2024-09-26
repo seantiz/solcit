@@ -83,8 +83,7 @@
           "resources/jobDescription.json",
           "resources/insegnante.sqlite",
           "resources/api.py",
-          "resources/build/*",
-          "resources/dist/api"
+          "resources/requirements.txt"
         ]
       },
       "security": {

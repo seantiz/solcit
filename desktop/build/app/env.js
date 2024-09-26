@@ -1,0 +1,1 @@
+export const env={"PUBLIC_NODE_ENV":"development","PUBLIC_FILES_PATH":"/Users/applesmg/Localdocs","PUBLIC_SAVED_JOBDESC":"jobDescription.json","PUBLIC_SAVED_CONFIG":"config.json","PUBLIC_SAVED_CV_DETAILS":"applicant_details.json"}

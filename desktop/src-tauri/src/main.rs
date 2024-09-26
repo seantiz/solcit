@@ -7,6 +7,8 @@ use std::io::{BufRead, BufReader};
 use std::sync::mpsc;
 use std::thread;
 use std::fs;
+use std::pin::Pin;
+use std::future::Future;
 use tauri::Manager;
 use window_shadows::set_shadow;
 use rusqlite::{Connection, Result as SqliteResult};
@@ -16,7 +18,13 @@ use serde_json::json;
 use tauri::async_runtime::spawn;
 use tauri::AppHandle;
 use log::{info, error, LevelFilter};
-use simple_logger::SimpleLogger;
+use simplelog::{CombinedLogger, Config, TermLogger, WriteLogger, TerminalMode};
+use std::fs::File;
+use home;
+use tokio::process::Command as TokioCommand;
+use tokio::task;
+use tokio::time::{sleep, Duration};
+use std::process::Stdio;
 
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,11 +64,30 @@ struct ParsedDetails {
 }
 
 fn main() {
-    SimpleLogger::new()
-        .with_level(LevelFilter::Info)
-        .with_utc_timestamps()
-        .init()
-        .expect("Failed to initialize logger");
+    // Setup logging
+    let log_file = get_log_file_path();
+
+    // Ensure the directory exists
+    if let Some(parent) = log_file.parent() {
+        std::fs::create_dir_all(parent).expect("Failed to create log directory");
+    }
+
+    CombinedLogger::init(vec![
+        TermLogger::new(
+            LevelFilter::Info,
+            Config::default(),
+            TerminalMode::Mixed,
+            simplelog::ColorChoice::Auto,
+        ),
+        WriteLogger::new(
+            LevelFilter::Info,
+            Config::default(),
+            File::create(&log_file).expect("Failed to create log file"),
+        ),
+    ])
+    .expect("Failed to initialize logger");
+
+    info!("Logging initialized at {:?}", log_file);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_window_state::Builder::default().build())
@@ -97,6 +124,22 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn get_log_file_path() -> PathBuf {
+    if cfg!(target_os = "macos") {
+        // On macOS, use ~/Library/Logs/YourAppName/
+        home::home_dir()
+            .expect("Failed to get home directory")
+            .join("Library/Logs/Solicit/app.log")
+    } else {
+        // For other OS, use the current executable's directory
+        std::env::current_exe()
+            .expect("Failed to get current exe path")
+            .parent()
+            .expect("Failed to get parent directory")
+            .join("app.log")
+    }
 }
 
 fn get_resource_path(app_handle: &AppHandle, resource: &str) -> PathBuf {
@@ -203,104 +246,158 @@ fn write_job_description(app_handle: AppHandle, content: String) -> Result<(), S
 }
 
 #[tauri::command]
-fn start_python_server(app_handle: AppHandle) -> Result<(), String> {
+async fn start_python_server(app_handle: AppHandle) -> Result<(), String> {
     let is_dev = cfg!(debug_assertions);
     info!("Is development mode: {}", is_dev);
 
-    let api_path = if is_dev {
-        app_handle.path_resolver()
-            .resolve_resource("resources/api.py")
-            .expect("Failed to resolve resource in dev mode")
-    } else {
-        app_handle.path_resolver()
-            .resolve_resource("api.py")
-            .expect("Failed to resolve resource in production mode")
-    };
+    let app_local_data_dir = app_handle.path_resolver()
+        .app_local_data_dir()
+        .expect("Failed to get app local data directory");
+    info!("App local data directory: {:?}", app_local_data_dir);
 
-    let _resource_path = if is_dev {
+    let resources_path = if is_dev {
         app_handle.path_resolver()
-            .resolve_resource("resources/api.py")
-            .expect("Failed to resolve resource in dev mode")
+            .resolve_resource("resources")
+            .expect("Failed to resolve resources directory")
     } else {
-        app_handle.path_resolver()
-            .resolve_resource("api.py")
-            .expect("Failed to resolve resource in production mode")
+        app_local_data_dir.join("resources")
     };
+    info!("Resources path: {:?}", resources_path);
 
-    let venv_activate = if is_dev {
+    let api_path = resources_path.join("api.py");
+    let requirements_path = resources_path.join("requirements.txt");
+    let venv_path = if is_dev {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..").join("..").join("backend").join("venv").join("bin").join("activate")
+            .join("..").join("..").join("backend").join("venv")
     } else {
-        app_handle.path_resolver()
-            .app_local_data_dir()
-            .expect("Failed to get app data directory")
-            .join("backend").join("venv").join("bin").join("activate")
+        resources_path.join("venv");
     };
+    let venv_activate = venv_path.join("bin").join("activate");
 
-    info!("Starting Python server at: {:?}", api_path);
+    info!("API path: {:?}", api_path);
+    info!("Requirements path: {:?}", requirements_path);
+    info!("Venv path: {:?}", venv_path);
     info!("Venv activate path: {:?}", venv_activate);
 
-    let (tx, rx) = mpsc::channel();
+    if !is_dev {
+        info!("Running in production mode, setting up environment...");
 
-    thread::spawn(move || {
-        let activate_cmd = format!("source {:?} && python3 {:?}", venv_activate, api_path);
+        // Copy resources to app local data directory if they don't exist
+        if !resources_path.exists() {
+            info!("Resources directory doesn't exist, creating and copying...");
+            let bundled_resources = app_handle.path_resolver()
+                .resolve_resource("resources")
+                .expect("Failed to resolve bundled resources");
+            info!("Bundled resources path: {:?}", bundled_resources);
 
-        let mut child = Command::new("sh")
-            .arg("-c")
-            .arg(&activate_cmd)
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .map_err(|e| {
-                error!("Failed to start Python server: {}", e);
-                format!("Failed to start Python server: {}", e)
-            })?;
+            tokio::fs::create_dir_all(&resources_path).await
+                .map_err(|e| format!("Failed to create resources directory: {}", e))?;
 
-        let stdout = child.stdout.take()
-            .ok_or_else(|| {
-                error!("Failed to capture stdout");
-                "Failed to capture stdout".to_string()
-            })?;
-        let stderr = child.stderr.take()
-            .ok_or_else(|| {
-                error!("Failed to capture stderr");
-                "Failed to capture stderr".to_string()
-            })?;
-
-        let tx_stdout = tx.clone();
-        thread::spawn(move || {
-            let reader = BufReader::new(stdout);
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    tx_stdout.send(format!("STDOUT: {}", line)).unwrap();
-                }
-            }
-        });
-
-        let tx_stderr = tx.clone();
-        thread::spawn(move || {
-            let reader = BufReader::new(stderr);
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    tx_stderr.send(format!("STDERR: {}", line)).unwrap();
-                }
-            }
-        });
-
-        let _ = child.wait();
-        Ok::<(), String>(())
-    });
-
-    thread::spawn(move || {
-        for received in rx {
-            info!("{}", received);
+            copy_directory(bundled_resources, resources_path).await
+                .map_err(|e| format!("Failed to copy resources: {}", e))?;
+        } else {
+            info!("Resources directory already exists");
         }
-    });
 
-    Ok(())
+        // Create virtual environment
+        info!("Creating virtual environment...");
+        let create_venv_cmd = format!("python3 -m venv {:?}", venv_path);
+        execute_command(&create_venv_cmd).await?;
+
+        // Activate virtual environment and install requirements
+        info!("Activating virtual environment and installing requirements...");
+        let install_req_cmd = format!("source {:?} && pip install -r {:?}", venv_activate, requirements_path);
+        execute_command(&install_req_cmd).await?;
+    }
+
+    // Run the API script as a background process
+    info!("Starting the Python server...");
+    let run_api_cmd = format!("source {:?} && python3 {:?}", venv_activate, api_path);
+    let child = TokioCommand::new("sh")
+        .arg("-c")
+        .arg(&run_api_cmd)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to start Python server: {}", e))?;
+
+    // Wait a bit to allow the server to start
+    sleep(Duration::from_secs(2)).await;
+
+    let mut child = TokioCommand::new("sh")
+    .arg("-c")
+    .arg(&run_api_cmd)
+    .spawn()
+    .map_err(|e| {
+        error!("Failed to start Python server: {}", e);
+        format!("Failed to start Python server: {}", e)
+    })?;
+
+// Check if the process is still running
+match child.try_wait() {
+    Ok(Some(status)) => {
+        error!("Python server exited unexpectedly with status: {}", status);
+        Err("Python server exited unexpectedly".to_string())
+    }
+    Ok(None) => {
+        info!("Python server started successfully and is running");
+        Ok(())
+    }
+    Err(e) => {
+        error!("Error checking Python server status: {}", e);
+        Err(format!("Error checking Python server status: {}", e))
+    }
+}
+}
+
+async fn execute_command(cmd: &str) -> Result<String, String> {
+    info!("Executing command: {}", cmd);
+    let output = TokioCommand::new("sh")
+        .arg("-c")
+        .arg(cmd)
+        .output()
+        .await
+        .map_err(|e| {
+            let error_msg = format!("Failed to execute command: {}", e);
+            error!("{}", error_msg);
+            error_msg
+        })?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    info!("TokioCommand STDOUT: {}", stdout);
+    info!("TokioCommand STDERR: {}", stderr);
+
+    if !output.status.success() {
+        let error_msg = format!("TokioCommand failed: {}. STDERR: {}", cmd, stderr);
+        error!("{}", error_msg);
+        return Err(error_msg);
+    }
+
+    info!("TokioCommand executed successfully");
+    Ok(stdout)
 }
 
 
+fn copy_directory(src: PathBuf, dst: PathBuf) -> Pin<Box<dyn Future<Output = std::io::Result<()>> + Send>> {
+    Box::pin(async move {
+        info!("Copying directory from {:?} to {:?}", src, dst);
+        tokio::fs::create_dir_all(&dst).await?;
+        let mut entries = tokio::fs::read_dir(&src).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let ty = entry.file_type().await?;
+            if ty.is_dir() {
+                copy_directory(entry.path(), dst.join(entry.file_name())).await?;
+            } else {
+                tokio::fs::copy(entry.path(), dst.join(entry.file_name())).await?;
+                info!("Copied file: {:?}", entry.path());
+            }
+        }
+        info!("Directory copied successfully");
+        Ok(())
+    })
+}
 
 #[tauri::command]
 fn update_job(app_handle: tauri::AppHandle, job_id: i32, job_update: JobUpdate) -> Result<Job, String> {
