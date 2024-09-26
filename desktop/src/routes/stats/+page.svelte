@@ -1,4 +1,5 @@
 <script lang="ts">
+    export const prerender = true
 	import { appliedTotal, fetchedTotal } from '$lib/jobHistory'
 </script>
 

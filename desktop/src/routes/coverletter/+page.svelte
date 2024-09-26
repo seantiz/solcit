@@ -1,4 +1,5 @@
 <script lang="ts">
+    export const prerender = true
 	import { PUBLIC_FILES_PATH, PUBLIC_SAVED_CONFIG } from '$env/static/public'
 	import { CoverLetter } from '$components'
 	import { currentLetter } from '$lib/jobApplication'
