@@ -1,0 +1,16 @@
+{
+	"/": [
+		"src/routes/+page.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/coverletter": [
+		"src/routes/+layout.ts"
+	],
+	"/cv": [
+		"src/routes/+layout.ts"
+	],
+	"/stats": [
+		"src/routes/+layout.ts"
+	]
+}

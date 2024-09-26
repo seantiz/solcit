@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-python:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r backend/requirements.txt
+    - name: Run Python tests
+      run: |
+        pytest backend/tests
+
+  build-and-test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16'
+    - name: Install dependencies
+      working-directory: ./desktop
+      run: npm install
+    - name: Build Svelte app
+      working-directory: ./desktop
+      run: npm run build
+    - name: Run frontend tests
+      working-directory: ./desktop
+      run: npm test
+
+  build-tauri:
+    needs: [test-python, build-and-test-frontend]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: setup node
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16'
+    - name: install Rust stable
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+    - name: install dependencies (ubuntu only)
+      run: |
+        apt-get update
+        apt-get install -y libgtk-3-dev webkit2gtk-4.0 libappindicator3-dev librsvg2-dev patchelf
+    - name: install app dependencies and build it
+      working-directory: ./desktop
+      run: npm install && npm run build
+    - uses: tauri-apps/tauri-action@v0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }},
+        PUBLIC_FILES_PATH: ${{ secrets.PUBLIC_FILES_PATH }},
+        PUBLIC_SAVED_JOBDESC: ${{ secrets.PUBLIC_SAVED_JOBDESC }},
+        PUBLIC_SAVED_CONFIG: ${{ secrets.PUBLIC_SAVED_CONFIG }},
+        PUBLIC_SAVED_CVDETAILS: ${{ secrets.PUBLIC_SAVED_CVDETAILS }},
+        PUBLIC_NODE_ENV: ${{ secrets.PUBLIC_NODE_ENV }},
