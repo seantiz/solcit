@@ -13,9 +13,6 @@ const config = {
 			precompress: false,
 			strict: true
 		}),
-        prerender: {
-            entries: ['*']
-          },
 		appDir: 'app',
 		alias: {
 			"$components" : path.resolve("src/components")
