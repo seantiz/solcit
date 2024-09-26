@@ -1,11 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::env;
-use std::process::{Command};
 use std::path::PathBuf;
-use std::io::{BufRead, BufReader};
-use std::sync::mpsc;
-use std::thread;
 use std::fs;
 use std::pin::Pin;
 use std::future::Future;
@@ -22,7 +18,6 @@ use simplelog::{CombinedLogger, Config, TermLogger, WriteLogger, TerminalMode};
 use std::fs::File;
 use home;
 use tokio::process::Command as TokioCommand;
-use tokio::task;
 use tokio::time::{sleep, Duration};
 use std::process::Stdio;
 
@@ -270,7 +265,7 @@ async fn start_python_server(app_handle: AppHandle) -> Result<(), String> {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..").join("..").join("backend").join("venv")
     } else {
-        resources_path.join("venv");
+        resources_path.join("venv")
     };
     let venv_activate = venv_path.join("bin").join("activate");
 
@@ -313,7 +308,7 @@ async fn start_python_server(app_handle: AppHandle) -> Result<(), String> {
     // Run the API script as a background process
     info!("Starting the Python server...");
     let run_api_cmd = format!("source {:?} && python3 {:?}", venv_activate, api_path);
-    let child = TokioCommand::new("sh")
+    TokioCommand::new("sh")
         .arg("-c")
         .arg(&run_api_cmd)
         .stdout(Stdio::piped())
