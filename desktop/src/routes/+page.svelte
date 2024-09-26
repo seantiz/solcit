@@ -1,5 +1,4 @@
 <script lang="ts">
-    export const prerender = true
 	import { allJobs, jobSite, unreadJobs, fetching, fetchedTotal, appliedTotal } from '$lib/jobHistory'
 	import { generatedLetter, nextJobApplication, nextJobDetails } from '$lib/jobApplication'
 	import { jobhunter, updateJobRecord} from '$lib/jobIO'

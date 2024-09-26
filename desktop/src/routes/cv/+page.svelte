@@ -1,5 +1,4 @@
 <script lang="ts">
-    export const prerender = true
 	import { currentCV, nextJobApplication, currentLetter } from '$lib/jobApplication'
 	import type { ApplicantDetails } from '$lib'
 	import { jobhunter } from '$lib/jobIO'
