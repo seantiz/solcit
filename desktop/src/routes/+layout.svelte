@@ -85,7 +85,7 @@
 						class:border-yellow-500={!$fetching}
 						class:border-red-600={$fetching}
 					>
-						<img src="/headshot2.jpeg" alt="Sean Headshot" class="h-10 w-10 object-cover" />
+                    <div class="h-10 w-10 bg-yellow-500"></div>
 						<div
 							class="-transform-x-1 absolute right-0 top-0 h-3.5 w-3.5 -translate-y-1 transform rounded-full"
 							class:bg-yellow-500={!$fetching}
