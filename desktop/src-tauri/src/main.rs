@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::env;
-use std::process::{Command,Stdio};
+use std::process::{Command};
 use std::path::PathBuf;
 use std::io::{BufRead, BufReader};
 use std::sync::mpsc;
@@ -15,6 +15,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::async_runtime::spawn;
 use tauri::AppHandle;
+use log::{info, error, LevelFilter};
+use simple_logger::SimpleLogger;
 
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -54,6 +56,12 @@ struct ParsedDetails {
 }
 
 fn main() {
+    SimpleLogger::new()
+        .with_level(LevelFilter::Info)
+        .with_utc_timestamps()
+        .init()
+        .expect("Failed to initialize logger");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
@@ -69,7 +77,7 @@ fn main() {
             initialise_database(&conn).unwrap();
             initialise_config(app.handle()).unwrap();
 
-            Ok(())
+            Ok::<(), Box<dyn std::error::Error>>(())
         })
         .invoke_handler(tauri::generate_handler![
             start_python_server,
@@ -90,7 +98,6 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-
 
 fn get_resource_path(app_handle: &AppHandle, resource: &str) -> PathBuf {
     app_handle.path_resolver()
@@ -197,22 +204,68 @@ fn write_job_description(app_handle: AppHandle, content: String) -> Result<(), S
 
 #[tauri::command]
 fn start_python_server(app_handle: AppHandle) -> Result<(), String> {
-    let api_path = get_resource_path(&app_handle, "api.py");
+    let is_dev = cfg!(debug_assertions);
+    info!("Is development mode: {}", is_dev);
 
-    println!("Starting Python server at: {:?}", api_path);
+    let api_path = if is_dev {
+        app_handle.path_resolver()
+            .resolve_resource("resources/api.py")
+            .expect("Failed to resolve resource in dev mode")
+    } else {
+        app_handle.path_resolver()
+            .resolve_resource("api.py")
+            .expect("Failed to resolve resource in production mode")
+    };
+
+    let _resource_path = if is_dev {
+        app_handle.path_resolver()
+            .resolve_resource("resources/api.py")
+            .expect("Failed to resolve resource in dev mode")
+    } else {
+        app_handle.path_resolver()
+            .resolve_resource("api.py")
+            .expect("Failed to resolve resource in production mode")
+    };
+
+    let venv_activate = if is_dev {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..").join("..").join("backend").join("venv").join("bin").join("activate")
+    } else {
+        app_handle.path_resolver()
+            .app_local_data_dir()
+            .expect("Failed to get app data directory")
+            .join("backend").join("venv").join("bin").join("activate")
+    };
+
+    info!("Starting Python server at: {:?}", api_path);
+    info!("Venv activate path: {:?}", venv_activate);
 
     let (tx, rx) = mpsc::channel();
 
     thread::spawn(move || {
-        let mut child = Command::new("python3")
-            .arg(api_path)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .expect("Failed to start Python server");
+        let activate_cmd = format!("source {:?} && python3 {:?}", venv_activate, api_path);
 
-        let stdout = child.stdout.take().expect("Failed to capture stdout");
-        let stderr = child.stderr.take().expect("Failed to capture stderr");
+        let mut child = Command::new("sh")
+            .arg("-c")
+            .arg(&activate_cmd)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| {
+                error!("Failed to start Python server: {}", e);
+                format!("Failed to start Python server: {}", e)
+            })?;
+
+        let stdout = child.stdout.take()
+            .ok_or_else(|| {
+                error!("Failed to capture stdout");
+                "Failed to capture stdout".to_string()
+            })?;
+        let stderr = child.stderr.take()
+            .ok_or_else(|| {
+                error!("Failed to capture stderr");
+                "Failed to capture stderr".to_string()
+            })?;
 
         let tx_stdout = tx.clone();
         thread::spawn(move || {
@@ -235,16 +288,18 @@ fn start_python_server(app_handle: AppHandle) -> Result<(), String> {
         });
 
         let _ = child.wait();
+        Ok::<(), String>(())
     });
 
     thread::spawn(move || {
         for received in rx {
-            println!("{}", received);
+            info!("{}", received);
         }
     });
 
     Ok(())
 }
+
 
 
 #[tauri::command]
@@ -295,67 +350,6 @@ fn update_job(app_handle: tauri::AppHandle, job_id: i32, job_update: JobUpdate) 
     ).map_err(|e| e.to_string())?;
 
     Ok(job)
-}
-
-#[tauri::command]
-async fn suggestions(query_details: serde_json::Value) -> Result<String, String> {
-    let client = Client::new();
-    let res = client.post("http://localhost:8080/api/suggestions")
-        .json(&query_details)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let status = res.status();
-    if !status.is_success() {
-        let error_text = res.text().await.map_err(|e| e.to_string())?;
-        return Err(format!("HTTP Error: {}, message: {}", status, error_text));
-    }
-
-    let response_json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    let cover_letter = response_json["cover_letter"].as_str()
-        .ok_or_else(|| "Cover letter not found in response".to_string())?
-        .to_string();
-
-    Ok(cover_letter)
-}
-
-#[tauri::command]
-async fn extract_cv_details(preprocessed_text: String) -> Result<ParsedDetails, String> {
-    let client = Client::new();
-    let res = client.post("http://localhost:8080/api/cv")
-        .json(&json!({ "text": preprocessed_text }))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let status = res.status();
-    if !status.is_success() {
-        let error_text = res.text().await.map_err(|e| e.to_string())?;
-        return Err(format!("HTTP Error: {}, message: {}", status, error_text));
-    }
-
-    let backend_result: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-
-    let frontend_result = ParsedDetails {
-        experience: backend_result["Experience"].as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join("\n"))
-            .unwrap_or_default(),
-        interests: backend_result["Interests"].as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join("\n"))
-            .unwrap_or_default(),
-        projects: backend_result["Projects"].as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join("\n"))
-            .unwrap_or_default(),
-        education: backend_result["Education"].as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join("\n"))
-            .unwrap_or_default(),
-        certificates: backend_result["Certificates"].as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join("\n"))
-            .unwrap_or_default(),
-    };
-
-    Ok(frontend_result)
 }
 
 #[tauri::command]
@@ -461,4 +455,66 @@ async fn get_unread_jobs(app_handle: tauri::AppHandle) -> Result<Vec<Job>, Strin
     }).await;
 
     jobs.map_err(|e| format!("Task join error: {}", e))?
+}
+
+
+#[tauri::command]
+async fn suggestions(query_details: serde_json::Value) -> Result<String, String> {
+    let client = Client::new();
+    let res = client.post("http://localhost:8080/api/suggestions")
+        .json(&query_details)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let status = res.status();
+    if !status.is_success() {
+        let error_text = res.text().await.map_err(|e| e.to_string())?;
+        return Err(format!("HTTP Error: {}, message: {}", status, error_text));
+    }
+
+    let response_json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let cover_letter = response_json["cover_letter"].as_str()
+        .ok_or_else(|| "Cover letter not found in response".to_string())?
+        .to_string();
+
+    Ok(cover_letter)
+}
+
+#[tauri::command]
+async fn extract_cv_details(preprocessed_text: String) -> Result<ParsedDetails, String> {
+    let client = Client::new();
+    let res = client.post("http://localhost:8080/api/cv")
+        .json(&json!({ "text": preprocessed_text }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let status = res.status();
+    if !status.is_success() {
+        let error_text = res.text().await.map_err(|e| e.to_string())?;
+        return Err(format!("HTTP Error: {}, message: {}", status, error_text));
+    }
+
+    let backend_result: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+
+    let frontend_result = ParsedDetails {
+        experience: backend_result["Experience"].as_array()
+            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join("\n"))
+            .unwrap_or_default(),
+        interests: backend_result["Interests"].as_array()
+            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join("\n"))
+            .unwrap_or_default(),
+        projects: backend_result["Projects"].as_array()
+            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join("\n"))
+            .unwrap_or_default(),
+        education: backend_result["Education"].as_array()
+            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join("\n"))
+            .unwrap_or_default(),
+        certificates: backend_result["Certificates"].as_array()
+            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join("\n"))
+            .unwrap_or_default(),
+    };
+
+    Ok(frontend_result)
 }
