@@ -13,26 +13,27 @@ import { allJobs, fetchedTotal, appliedTotal } from '$lib/jobHistory';
 import { currentCV, currentLetter, nextJobApplication, nextJobDetails } from '$lib/jobApplication';
 
 const dev = PUBLIC_NODE_ENV === 'development';
-const jobhunterlib: Promise<any> = browser
+const jobhunterlib: Promise<any> = typeof window !== 'undefined'
 	? import('$lib/jobIO').then((module) => module.jobhunter)
 	: new Promise(() => ({}));
 
-const getLoadApplicantConfig: Promise<() => Promise<any>> = browser
+const getLoadApplicantConfig: Promise<() => Promise<any>> = typeof window !== 'undefined'
 	? import('$lib/jobIO').then((module) => module.loadApplicantConfig)
 	: new Promise(() => () => Promise.resolve({}));
 
 let initialised: Writable<boolean> = writable(false);
 
 export const load = (async () => {
-	if (browser) {
-		initializeApp();
+	if (typeof window !== 'undefined') {
+		initialiseApp();
 	}
 	return {
 		initialised
 	};
 }) satisfies PageLoad;
 
-async function initializeApp() {
+async function initialiseApp() {
+    if (typeof window === 'undefined') return;
 	const jobhunter = await jobhunterlib;
 	jobhunter.startServer();
 
@@ -67,6 +68,7 @@ async function initializeApp() {
 	}
 
 	async function loadAppData() {
+        if (typeof window === 'undefined') return;
 		try {
 			const loadApplicantConfig = await getLoadApplicantConfig;
 			const applicantDetails = await loadApplicantConfig();
