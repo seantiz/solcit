@@ -9,7 +9,7 @@ const config = {
             ssr: false,
 			pages: 'build',
 			assets: 'build',
-			fallback: 'index.html',
+			fallback: false,
 			precompress: false,
 			strict: true
 		}),
