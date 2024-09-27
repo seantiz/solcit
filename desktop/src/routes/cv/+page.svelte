@@ -50,7 +50,7 @@
 			if (extractedText) {
 				const rawText = preprocessText(extractedText)
 				const preprocessedText = rawText.join(' ')
-				extractedResult = (await jobhunter.tauriCommand('extract_cv_details', {
+				extractedResult = (await jobhunter.tauriCommand('extract_cv', {
 					preprocessedText: preprocessedText
 				})) as ApplicantDetails
 

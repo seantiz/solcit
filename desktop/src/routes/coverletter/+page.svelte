@@ -29,11 +29,11 @@
 	}
 
 	async function saveLetterParam(content: string) {
-    await jobhunter.tauriCommand('write_config_file', { content: JSON.stringify({ coverLetter: content }) })
+    await jobhunter.tauriCommand('write_config', { content: JSON.stringify({ coverLetter: content }) })
 }
 
 async function readLetterParam(): Promise<string> {
-    const config = await jobhunter.tauriCommand('read_config_file') as string
+    const config = await jobhunter.tauriCommand('read_config') as string
     return JSON.parse(config).coverLetter || ''
 }
 

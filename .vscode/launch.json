@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug Tauri App",
+            "cargo": {
+                "args": ["build", "--manifest-path=./desktop/src-tauri/Cargo.toml", "--no-default-features"]
+            },
+            "program": "${workspaceFolder}/desktop/src-tauri/target/debug/Solicit",
+            "cwd": "${workspaceFolder}/desktop/src-tauri",
+            "args": [],
+            "env": {
+                "RUST_BACKTRACE": "1"
+            }
+        }
+    ]
+}
+
+

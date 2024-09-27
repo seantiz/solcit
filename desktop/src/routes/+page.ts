@@ -1,5 +1,4 @@
 import type { PageLoad } from './$types';
-import { browser } from '$app/environment';
 import {
 	PUBLIC_FILES_PATH,
 	PUBLIC_SAVED_CONFIG,
@@ -43,7 +42,7 @@ async function initialiseApp() {
 			const content = await jobhunter.read(config);
 			return JSON.parse(content).coverLetter || '';
 		} else {
-			const content = (await jobhunter.tauriCommand('read_config_file')) as string;
+			const content = (await jobhunter.tauriCommand('read_config')) as string;
 			return JSON.parse(content).coverLetter || '';
 		}
 	}
@@ -63,7 +62,7 @@ async function initialiseApp() {
 			const configPath = await jobhunter.resolvePath(PUBLIC_FILES_PATH, PUBLIC_SAVED_CONFIG);
 			return await jobhunter.read(configPath);
 		} else {
-			return (await jobhunter.tauriCommand('read_config_file')) as string;
+			return (await jobhunter.tauriCommand('read_config')) as string;
 		}
 	}
 

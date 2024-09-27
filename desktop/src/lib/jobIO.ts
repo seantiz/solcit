@@ -130,7 +130,7 @@ export async function loadApplicantConfig() {
             const fileContents = await jobhunter.read(path);
             return JSON.parse(fileContents);
         } else {
-            const fileContents = await jobhunter.tauriCommand('read_config_file') as string;
+            const fileContents = await jobhunter.tauriCommand('read_config') as string;
             return JSON.parse(fileContents);
         }
     } catch (error) {
