@@ -44,6 +44,9 @@ jobs:
     - name: Build Svelte app
       working-directory: ./desktop
       run: npm run build
+    - name: Install Chromium
+      working-directory: ./desktop
+      run: npx playwright install
     - name: Run frontend tests
       working-directory: ./desktop
       run: npm run test:load
