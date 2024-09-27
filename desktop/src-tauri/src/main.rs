@@ -17,7 +17,7 @@ use simplelog::{LevelFilter, CombinedLogger, Config, TermLogger, WriteLogger, Te
 use llm::{suggestions, extract_cv};
 use jobsearch::{find_indeed_listings, find_jooble_listings};
 use server::{start_python_server, initialise_database, get_unread_jobs, update_job, get_stats};
-use appconfig::{initialise_config, read_config, write_config, write_job_description, read_job_description};
+use appconfig::{initialise_config, read_config, write_config, write_job_description, read_job_description, read_applicant_details, write_applicant_details};
 use helpers::{get_db_path, get_log_file_path};
 
 fn main() {
@@ -66,7 +66,8 @@ fn main() {
             find_jooble_listings,
             write_job_description,
             read_job_description,
-            initialise_config,
+            write_applicant_details,
+            read_applicant_details,
             write_config,
             read_config,
             start_python_server,

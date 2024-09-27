@@ -97,35 +97,47 @@ async function refreshListings() {
   }
 }
 
-	async function makeJobApplication() {
-		try {
-			const confirmed = await jobhunter.askConfirmation(
-				'Save job application details?',
-				'Please Confirm'
-			)
+async function makeJobApplication() {
+    try {
+        const confirmed = await jobhunter.askConfirmation(
+            'Save job application details?',
+            'Please Confirm'
+        )
 
-			if (!confirmed) {
-				return ''
-			}
+        if (!confirmed) {
+            return
+        }
 
-			const dataToSave = {
-				...nextJobDetails,
-				name: $nextJobApplication.name,
-				experience: $nextJobApplication.experience,
-				interests: $nextJobApplication.interests,
-				projects: $nextJobApplication.projects,
-				education: $nextJobApplication.education,
-				certificates: $nextJobApplication.certificates
-			}
-			await jobhunter.tauriCommand('write_job_description', { content: JSON.stringify(dataToSave) })
-				.then(async () => jobhunter.showMessage('Job application saved.', 'Success'))
-		} catch (error) {
-			await jobhunter.showMessage('Failed to save. Try again?', {
-				title: 'Could Not Save',
-				type: 'error'
-			})
-		}
-	}
+        // Save job description
+        const jobDescriptionData = {
+            jobTitle: $nextJobDetails.jobTitle,
+            company: $nextJobDetails.company,
+            jobDescription: $nextJobDetails.jobDescription,
+            keyRequirements: $nextJobDetails.keyRequirements
+        }
+        await jobhunter.tauriCommand('write_job_description', { content: JSON.stringify(jobDescriptionData) })
+
+        // Save applicant details
+        const applicantDetailsData = {
+            name: $nextJobApplication.name,
+            experience: $nextJobApplication.experience,
+            interests: $nextJobApplication.interests,
+            projects: $nextJobApplication.projects,
+            education: $nextJobApplication.education,
+            certificates: $nextJobApplication.certificates
+        }
+        await jobhunter.tauriCommand('write_applicant_details', { content: JSON.stringify(applicantDetailsData) })
+
+        await jobhunter.showMessage('Job application saved.', 'Success')
+    } catch (error) {
+        console.error('Error saving job application:', error)
+        await jobhunter.showMessage('Failed to save. Try again?', {
+            title: 'Could Not Save',
+            type: 'error'
+        })
+    }
+}
+
 
 	async function submitQuery(): Promise<void> {
 		try {
