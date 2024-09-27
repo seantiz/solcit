@@ -11,7 +11,7 @@
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"tauri": "tauri",
-        "test:jooblespring": "playwright test e2e/test.ts"
+        "test:load": "playwright test loading.test.ts"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.47.2",

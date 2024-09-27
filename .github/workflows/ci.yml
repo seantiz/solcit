@@ -46,7 +46,7 @@ jobs:
       run: npm run build
     - name: Run frontend tests
       working-directory: ./desktop
-      run: npm run test:jooblespring
+      run: npm run test:load
 
   build-tauri:
     needs: [test-python, build-and-test-frontend]
