@@ -7,6 +7,16 @@ use std::pin::Pin;
 use home;
 
 pub fn get_resource_path(app_handle: &AppHandle, resource: &str) -> PathBuf {
+    // Dev: src-tauri/resources/<resource>
+
+    /* Prod
+    Windows: C:\Program Files\<Appname>\resources\<resource>
+    macOS: /Applications/<Appname>.app/Contents/Resources/<resource>
+    Linux /usr/share/<appname>/resources/<resource> or ~/.local/share/<appname>/resources/<resource>
+    */
+
+    // Used in production to help resolve the search_engine__.py scripts
+
     app_handle.path_resolver()
         .resolve_resource(format!("resources/{}", resource))
         .expect(&format!("failed to resolve resource {}", resource))
@@ -14,10 +24,16 @@ pub fn get_resource_path(app_handle: &AppHandle, resource: &str) -> PathBuf {
 
 pub fn get_db_path(app_handle: &AppHandle) -> PathBuf {
     if cfg!(debug_assertions) {
-        // Development mode
+        // Use get_resource_path callback ONLY in dev mode
+        // Dev: src-tauri/resources/insegnante.sqlite
+
         get_resource_path(app_handle, "insegnante.sqlite")
     } else {
-        // Production mode
+        /* User-related info best stored in tauri.AppHandle.app.data.dir() in Prod
+        macOS : ~/Library/Application Support/<AppName>/insegnante.sqlite
+        Windows: C:\Users\<Username>\AppData\Roaming\<AppName>\insegnante.sqlite
+        Linux: ~/.local/share/<AppName>/insegnante.sqlite */
+
         app_handle.path_resolver().app_data_dir()
             .unwrap()
             .join("insegnante.sqlite")
@@ -26,12 +42,12 @@ pub fn get_db_path(app_handle: &AppHandle) -> PathBuf {
 
 pub fn get_log_file_path() -> PathBuf {
     if cfg!(target_os = "macos") {
-        // On macOS, use ~/Library/Logs/YourAppName/
+        // Prod (macOS): ~/Library/Logs/<AppName>/
         home::home_dir()
             .expect("Failed to get home directory")
             .join("Library/Logs/Solicit/app.log")
     } else {
-        // For other OS, use the current executable's directory
+        // Prod (Windows, Linux): the current executable's directory
         std::env::current_exe()
             .expect("Failed to get current exe path")
             .parent()
