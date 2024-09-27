@@ -76,16 +76,8 @@
           "timestampUrl": ""
         },
         "resources": [
-          "resources/search_engine_indeed.py",
-          "resources/search_engine_jooble.py",
-          "resources/config.json",
-          "resources/applicant_details.json",
-          "resources/jobDescription.json",
-          "resources/insegnante.sqlite",
-          "resources/api.py",
-          "resources/requirements.txt"
-        ]
-      },
+        "resources/*"
+      ]},
       "security": {
         "csp": null
       },

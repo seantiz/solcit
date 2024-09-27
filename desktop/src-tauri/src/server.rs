@@ -1,9 +1,9 @@
 use crate::schemas::{Job, JobUpdate, Stats};
-use crate::helpers::{execute_command, copy_directory, get_db_path};
+use crate::helpers::{execute_command, copy_directory, get_db_path, get_system_resource_path};
 use tokio::process::Command as TokioCommand;
 use rusqlite::{Connection, Result as DBResult};
 use tauri::async_runtime::spawn;
-use simplelog::{info, error};
+use log::{info, error};
 use std::path::PathBuf;
 use tauri::AppHandle;
 
@@ -22,12 +22,21 @@ pub async fn start_python_server(app_handle: AppHandle) -> Result<(), String> {
             .resolve_resource("resources")
             .expect("Failed to resolve resources directory")
     } else {
-        app_local_data_dir.join("resources")
+        get_system_resource_path(&app_handle, "")
     };
     info!("Resources path: {:?}", resources_path);
 
-    let api_path = resources_path.join("api.py");
-    let requirements_path = resources_path.join("requirements.txt");
+    let api_path = if is_dev {
+        resources_path.join("api.py")
+    } else {
+        get_system_resource_path(&app_handle, "api.py")
+    };
+    let requirements_path = if is_dev {
+        resources_path.join("requirements.txt")
+    } else {
+        get_system_resource_path(&app_handle, "requirements.txt")
+    };
+
     let venv_path = if is_dev {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..").join("..").join("backend").join("venv")

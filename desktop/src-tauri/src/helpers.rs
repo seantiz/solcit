@@ -1,12 +1,12 @@
 use tokio::process::Command as TokioCommand;
-use simplelog::{info, error};
+use log::{info, error};
 use tauri::AppHandle;
 use std::path::PathBuf;
 use std::future::Future;
 use std::pin::Pin;
 use home;
 
-pub fn get_resource_path(app_handle: &AppHandle, resource: &str) -> PathBuf {
+pub fn get_system_resource_path(app_handle: &AppHandle, resource: &str) -> PathBuf {
     // Dev: src-tauri/resources/<resource>
 
     /* Prod
@@ -22,21 +22,26 @@ pub fn get_resource_path(app_handle: &AppHandle, resource: &str) -> PathBuf {
         .expect(&format!("failed to resolve resource {}", resource))
 }
 
+pub fn get_user_resource_path(app_handle: &AppHandle, resource: &str) -> PathBuf {
+    let app_local_data_dir = app_handle.path_resolver()
+        .app_local_data_dir()
+        .expect("Failed to get app local data directory");
+    app_local_data_dir.join(resource)
+}
+
 pub fn get_db_path(app_handle: &AppHandle) -> PathBuf {
     if cfg!(debug_assertions) {
-        // Use get_resource_path callback ONLY in dev mode
+        // Use get_system_resource_path callback ONLY in dev mode
         // Dev: src-tauri/resources/insegnante.sqlite
 
-        get_resource_path(app_handle, "insegnante.sqlite")
+        get_system_resource_path(app_handle, "insegnante.sqlite")
     } else {
         /* User-related info best stored in tauri.AppHandle.app.data.dir() in Prod
         macOS : ~/Library/Application Support/<AppName>/insegnante.sqlite
         Windows: C:\Users\<Username>\AppData\Roaming\<AppName>\insegnante.sqlite
         Linux: ~/.local/share/<AppName>/insegnante.sqlite */
-
-        app_handle.path_resolver().app_data_dir()
-            .unwrap()
-            .join("insegnante.sqlite")
+        // Use get_user_resource_path in production
+        get_user_resource_path(app_handle, "insegnante.sqlite")
     }
 }
 

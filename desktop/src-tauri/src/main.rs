@@ -8,10 +8,11 @@ mod appconfig;
 mod jobsearch;
 
 use tauri::Manager;
+use log::info;
 use rusqlite::Connection;
 use std::fs::{self, File};
 use window_shadows::set_shadow;
-use simplelog::{info, LevelFilter, CombinedLogger, Config, TermLogger, WriteLogger, TerminalMode};
+use simplelog::{LevelFilter, CombinedLogger, Config, TermLogger, WriteLogger, TerminalMode};
 
 use llm::{suggestions, extract_cv};
 use jobsearch::{find_indeed_listings, find_jooble_listings};
