@@ -13,10 +13,8 @@
 		"tauri": "tauri"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-auto": "^3.0.0",
-		"@sveltejs/adapter-static": "^3.0.4",
+		"@playwright/test": "^1.47.2",
 		"@sveltejs/kit": "^2.6.0",
-		"@sveltejs/vite-plugin-svelte": "^3.0.0",
 		"@tauri-apps/cli": "^1.6.1",
 		"@types/eslint": "^9.6.0",
 		"autoprefixer": "^10.4.20",
@@ -24,6 +22,7 @@
 		"eslint-config-prettier": "^9.1.0",
 		"eslint-plugin-svelte": "^2.36.0",
 		"globals": "^15.0.0",
+		"playwright": "^1.47.2",
 		"prettier": "^3.1.1",
 		"prettier-plugin-svelte": "^3.1.2",
 		"prettier-plugin-tailwindcss": "^0.6.5",
@@ -36,7 +35,7 @@
 	"type": "module",
 	"dependencies": {
 		"@anthropic-ai/sdk": "^0.27.3",
-		"@sveltejs/adapter-node": "^5.2.2",
+		"@sveltejs/adapter-static": "^3.0.5",
 		"@tauri-apps/api": "^1.6.0",
 		"ollama": "^0.5.9",
 		"pdfjs-dist": "^4.5.136"
