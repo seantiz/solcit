@@ -67,25 +67,26 @@
 	}
 
     async function searchJooble() {
-        if (!jobKeywords) {
-            await jobhunter.showMessage('Please enter job keywords', 'Error');
-            return;
-        }
-        fetching.set(true);
-        try {
-            await jobhunter.tauriCommand('run_search_engine', {
-                engine: 'jooble',
-                keywords: jobKeywords,
-                location: 'Italy' // TODO: make dynamic user input
-            });
-            await refreshJobListings();
-        } catch (error) {
-            console.error('Error searching Jooble:', error);
-            await jobhunter.showMessage(`Couldn't fetch Jooble listings: ${error}`, 'Error');
-        } finally {
-            fetching.set(false);
-        }
+    if (!jobKeywords) {
+        await jobhunter.showMessage('Please enter job keywords', 'Error');
+        return;
     }
+    fetching.set(true);
+    try {
+        const result = await jobhunter.tauriCommand('run_jooble_search', {
+            keywords: jobKeywords,
+            location: 'Provincia di Monza Brianza' // TODO: make dynamic user input
+        });
+        console.log(result); // This will log the success message
+        await refreshJobListings();
+    } catch (error) {
+        console.error('Error searching Jooble:', error);
+        await jobhunter.showMessage(`Couldn't fetch Jooble listings: ${error}`, 'Error');
+    } finally {
+        fetching.set(false);
+    }
+}
+
 
     async function searchIndeed() {
         if (!jobKeywords) {
