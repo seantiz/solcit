@@ -15,7 +15,7 @@ use window_shadows::set_shadow;
 use simplelog::{LevelFilter, CombinedLogger, Config, TermLogger, WriteLogger, TerminalMode};
 
 use llm::{set_key, get_key, suggestions, extract_cv};
-use jobsearch::{find_indeed_listings, find_jooble_listings};
+use jobsearch::{find_indeed_listings, run_jooble_search};
 use server::{start_api_server, get_unread_jobs, update_job, get_stats};
 use appconfig::{initialise_config, read_config, write_config, write_job_description, read_job_description, read_applicant_details, write_applicant_details};
 use helpers::{get_db_path, get_log_file_path};
@@ -65,7 +65,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             find_indeed_listings,
-            find_jooble_listings,
+            run_jooble_search,
             write_job_description,
             read_job_description,
             write_applicant_details,
