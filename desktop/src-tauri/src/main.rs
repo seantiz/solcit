@@ -8,15 +8,15 @@ mod appconfig;
 mod jobsearch;
 
 use tauri::Manager;
-use log::info;
 use rusqlite::Connection;
 use std::fs::{self, File};
+use std::path::Path;
 use window_shadows::set_shadow;
 use simplelog::{LevelFilter, CombinedLogger, Config, TermLogger, WriteLogger, TerminalMode};
 
-use llm::{suggestions, extract_cv};
+use llm::{set_key, get_key, suggestions, extract_cv};
 use jobsearch::{find_indeed_listings, find_jooble_listings};
-use server::{start_python_server, initialise_database, get_unread_jobs, update_job, get_stats};
+use server::{start_api_server, get_unread_jobs, update_job, get_stats};
 use appconfig::{initialise_config, read_config, write_config, write_job_description, read_job_description, read_applicant_details, write_applicant_details};
 use helpers::{get_db_path, get_log_file_path};
 
@@ -35,14 +35,12 @@ fn main() {
             simplelog::ColorChoice::Auto,
         ),
         WriteLogger::new(
-            LevelFilter::Info,
+            LevelFilter::Debug,
             Config::default(),
             File::create(&log_file).expect("Failed to create log file"),
         ),
     ])
     .expect("Failed to initialize logger");
-
-    info!("Logging initialized at {:?}", log_file);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_window_state::Builder::default().build())
@@ -51,13 +49,17 @@ fn main() {
             set_shadow(&window, true).expect("Unsupported platform!");
 
             let app_dir = app.path_resolver().app_data_dir().unwrap();
-            let db_path = get_db_path(&app.handle());
-
             fs::create_dir_all(&app_dir).expect("Failed to create app data directory");
 
-            let conn = Connection::open(&db_path).expect("Failed to open or create database");
-            initialise_database(&conn).unwrap();
+            copy_database(app)?;
+
+            let db_path = get_db_path(&app.handle());
+            let _conn = Connection::open(&db_path).expect("Failed to open database");
+
             initialise_config(app.handle()).unwrap();
+
+            // Start the API server
+            start_api_server(&app.handle()).expect("Failed to start API server");
 
             Ok::<(), Box<dyn std::error::Error>>(())
         })
@@ -70,10 +72,11 @@ fn main() {
             read_applicant_details,
             write_config,
             read_config,
-            start_python_server,
             get_unread_jobs,
             update_job,
             get_stats,
+            get_key,
+            set_key,
             suggestions,
             extract_cv,
             quit_app
@@ -85,4 +88,21 @@ fn main() {
 #[tauri::command]
 fn quit_app() {
     std::process::exit(0);
+}
+
+fn copy_database(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let source_path = app.path_resolver()
+        .resolve_resource("resources/insegnante.sqlite")
+        .expect("Failed to resolve source database path");
+
+    let dest_path = get_db_path(&app.handle());
+
+    if !Path::new(&dest_path).exists() {
+        fs::copy(source_path, &dest_path)?;
+        println!("Database copied from resources to: {:?}", dest_path);
+    } else {
+        println!("Database already exists at: {:?}", dest_path);
+    }
+
+    Ok(())
 }

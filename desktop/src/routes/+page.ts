@@ -33,7 +33,7 @@ export const load = (async () => {
 
 async function initialiseApp() {
 	const jobhunter = await jobhunterlib;
-	jobhunter.startServer();
+	// jobhunter.startServer();
 
 	async function readLetterParams(): Promise<string> {
 		if (dev) {

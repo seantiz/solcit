@@ -6,6 +6,13 @@ use std::future::Future;
 use std::pin::Pin;
 use home;
 
+pub fn get_credentials_file_path(app_handle: &AppHandle) -> PathBuf {
+    app_handle.path_resolver()
+        .app_data_dir()
+        .unwrap()
+        .join("credentials.json")
+}
+
 pub fn get_system_resource_path(app_handle: &AppHandle, resource: &str) -> PathBuf {
     // Dev: src-tauri/resources/<resource>
 

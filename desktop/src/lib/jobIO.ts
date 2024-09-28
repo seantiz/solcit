@@ -25,7 +25,7 @@ class Jobhunter {
 
 	async startServer() {
 		try {
-			return await invoke('start_python_server')
+			return await invoke('start_api_server')
 		} catch (error) {
 			throw error
 		}

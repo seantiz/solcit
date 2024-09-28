@@ -6,6 +6,83 @@ use tauri::async_runtime::spawn;
 use log::{info, error};
 use std::path::PathBuf;
 use tauri::AppHandle;
+use std::process::{Command, Stdio};
+use std::thread;
+use std::sync::mpsc;
+use std::io::{BufRead, BufReader};
+
+pub fn start_api_server(app_handle: &tauri::AppHandle) -> Result<(), String> {
+    let api_executable = app_handle.path_resolver()
+        .resolve_resource("resources/startup/apistart")
+        .ok_or_else(|| "Failed to resolve apistart resource".to_string())?;
+
+    let api_executable_str = api_executable.to_str()
+        .ok_or_else(|| "Failed to convert path to string".to_string())?
+        .to_string();
+
+    info!("Starting API server at: {}", api_executable_str);
+
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        match Command::new(&api_executable_str)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+        {
+            Ok(mut child) => {
+                info!("API server process started successfully");
+
+                let stdout = child.stdout.take()
+                    .ok_or_else(|| "Failed to capture stdout".to_string())?;
+                let stderr = child.stderr.take()
+                    .ok_or_else(|| "Failed to capture stderr".to_string())?;
+
+                let tx_stdout = tx.clone();
+                thread::spawn(move || {
+                    let reader = BufReader::new(stdout);
+                    for line in reader.lines() {
+                        if let Ok(line) = line {
+                            let _ = tx_stdout.send(format!("STDOUT: {}", line));
+                            info!("API Server STDOUT: {}", line);
+                        }
+                    }
+                });
+
+                let tx_stderr = tx.clone();
+                thread::spawn(move || {
+                    let reader = BufReader::new(stderr);
+                    for line in reader.lines() {
+                        if let Ok(line) = line {
+                            let _ = tx_stderr.send(format!("STDERR: {}", line));
+                            error!("API Server STDERR: {}", line);
+                        }
+                    }
+                });
+
+                match child.wait() {
+                    Ok(status) => info!("API server process exited with status: {:?}", status),
+                    Err(e) => error!("Error waiting for API server process: {}", e),
+                }
+            }
+            Err(e) => {
+                error!("Failed to start API server: {}", e);
+                return Err(format!("Failed to start API server: {}", e));
+            }
+        }
+        Ok(())
+    });
+
+    thread::spawn(move || {
+        for received in rx {
+            info!("API Server output: {}", received);
+        }
+    });
+
+    Ok(())
+}
+
+
 
 #[tauri::command]
 pub async fn start_python_server(app_handle: AppHandle) -> Result<(), String> {

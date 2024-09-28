@@ -2,6 +2,7 @@
 	import { currentCV, nextJobApplication, currentLetter } from '$lib/jobApplication'
 	import type { ApplicantDetails } from '$lib'
 	import { jobhunter } from '$lib/jobIO'
+    import { resourceDir, appDataDir } from '@tauri-apps/api/path';
 
 	import { PDF, BTA } from '$components'
 
@@ -10,66 +11,74 @@
 
 	import { onMount } from 'svelte'
 	import { get } from 'svelte/store'
-	import { PUBLIC_FILES_PATH, PUBLIC_SAVED_CONFIG } from '$env/static/public'
+	import { PUBLIC_FILES_PATH, PUBLIC_SAVED_CONFIG, PUBLIC_NODE_ENV } from '$env/static/public'
 
 	let uploading = false
 	let currentPDFContent: Blob | null = null
 	let preloadedCVPath: string | null = null
-	let pdfContent: ArrayBuffer
 	let extractedResult: ApplicantDetails | null = null
+    const dev = PUBLIC_NODE_ENV === 'development'
 
-	async function extractCVDetails() {
-		if (!preloadedCVPath) {
-			await jobhunter.showMessage('Please upload a CV first.', { title: 'No CV Found', type: 'error' })
-			return
-		}
+    async function extractCVDetails() {
+    if (!preloadedCVPath) {
+        await jobhunter.showMessage('Please upload a CV first.', { title: 'No CV Found', type: 'error' });
+        return;
+    }
 
-		const confirmed = await jobhunter.askConfirmation(
-			'This is an experimental feature using Claude AI. Are you sure?',
-			'Confirm Extraction'
-		)
+    const confirmed = await jobhunter.askConfirmation(
+        'This is an experimental feature using Claude AI. Are you sure?',
+        'Confirm Extraction'
+    );
 
-		if (!confirmed) {
-			return
-		}
+    if (!confirmed) {
+        return;
+    }
 
-		uploading = true
-		try {
-			if (currentPDFContent) {
-				pdfContent = await currentPDFContent.arrayBuffer()
-			} else {
-				const path = await jobhunter.resolvePath(PUBLIC_FILES_PATH, preloadedCVPath)
-				const fileContent = await jobhunter.readBinary(path)
-				if (fileContent) {
-					pdfContent = fileContent.buffer
-				}
-			}
+    uploading = true;
+    try {
+        let pdfContent: ArrayBuffer;
 
-			const extractedText = await extractText(pdfContent)
+        if (currentPDFContent) {
+            pdfContent = await currentPDFContent.arrayBuffer();
+        } else {
+            let path: string;
+            if (dev) {
+                path = await jobhunter.resolvePath(PUBLIC_FILES_PATH, preloadedCVPath);
+            } else {
+                const configpath = await appDataDir();
+                path = await jobhunter.resolvePath(configpath, preloadedCVPath);
+            }
 
-			if (extractedText) {
-				const rawText = preprocessText(extractedText)
-				const preprocessedText = rawText.join(' ')
-				extractedResult = (await jobhunter.tauriCommand('extract_cv', {
-					preprocessedText: preprocessedText
-				})) as ApplicantDetails
+            const fileContent = await jobhunter.readBinary(path);
+            if (!fileContent) {
+                throw new Error('Failed to read file content');
+            }
+            pdfContent = fileContent.buffer;
+        }
 
-				await jobhunter.showMessage('CV details extracted. Click save to accept.', 'Success')
-			} else {
-				await jobhunter.showMessage('Cannot extract CV details.', {
-					title: 'Extracted text Undefined',
-					type: 'error'
-				})
-			}
-		} catch (error) {
-			await jobhunter.showMessage(`Failed to process CV details: ${error}`, {
-				title: 'Failed to Extract From CV',
-				type: 'error'
-			})
-		} finally {
-			uploading = false
-		}
-	}
+        const extractedText = await extractText(pdfContent);
+
+        if (!extractedText) {
+            throw new Error('Cannot extract CV details');
+        }
+
+        const rawText = preprocessText(extractedText);
+        const preprocessedText = rawText.join(' ');
+        extractedResult = await jobhunter.tauriCommand('extract_cv', {
+            preprocessedText: preprocessedText
+        }) as ApplicantDetails;
+
+        await jobhunter.showMessage('CV details extracted. Click save to accept.', 'Success');
+
+    } catch (error) {
+        await jobhunter.showMessage(`Failed to process CV details: ${error}`, {
+            title: 'Failed to Extract From CV',
+            type: 'error'
+        });
+    } finally {
+        uploading = false;
+    }
+}
 
 	async function extractText(pdfContent: ArrayBuffer): Promise<string | undefined> {
 		let pdf: PDFDocumentProxy | null = null
@@ -105,8 +114,13 @@
 	}
 
 	async function saveConfig(config: { cvFilename: string; coverLetter: string }) {
+        let path:string
 		try {
-			const path = await jobhunter.resolvePath(PUBLIC_FILES_PATH, PUBLIC_SAVED_CONFIG)
+            if(dev) {
+			path = await jobhunter.resolvePath(PUBLIC_FILES_PATH, PUBLIC_SAVED_CONFIG) }
+            else {
+                const resources = await resourceDir()
+                path = await jobhunter.resolvePath(resources, 'config.json') }
 			await jobhunter.write(path, JSON.stringify(config))
 		} catch (error) {
 			throw error

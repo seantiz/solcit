@@ -34,6 +34,9 @@
 			case 'stats':
 				goto('/stats')
 				break
+            case 'credentials':
+                goto('/credentials')
+                break
 		}
 		dropdownVisible = false
 	}

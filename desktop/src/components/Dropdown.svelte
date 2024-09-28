@@ -43,6 +43,13 @@
 			>
 				My Cover Letter
 			</button>
+            <button
+				on:click={() => menuClick('credentials')}
+				class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-white dark:hover:bg-slate-400"
+				role="menuitem"
+			>
+				My API Key
+			</button>
 		</div>
 	</div>
 {/if}

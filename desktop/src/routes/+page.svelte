@@ -15,6 +15,8 @@
 	const { initialised } = data
 	const isGenerating = writable(false)
 
+    let jobKeywords = ''
+
 	let indeedSpring = spring(
 		{ scale: 1, rotate: 0 },
 		{
@@ -64,38 +66,72 @@
 		jobSite.set(event.detail)
 	}
 
-async function refreshListings() {
-  const confirmed = await jobhunter.askConfirmation('Are you sure you want to refresh job listings?', 'Confirm Refresh');
-  if (confirmed) {
-    fetching.set(true);
-    try {
-      const findListingsPromise = jobhunter.tauriCommand('find_listings');
-      await findListingsPromise;
-      const newJobs = await jobhunter.tauriCommand('get_unread_jobs') as Job[];
-      allJobs.update(jobs => {
-        const existingJobIds = new Set(jobs.map(job => job.id));
-        const uniqueNewJobs = newJobs.filter(job => !existingJobIds.has(job.id));
-        return [...jobs, ...uniqueNewJobs];
-      });
-
-      const newStats = await jobhunter.tauriCommand('get_stats') as Stats;
-      if (newStats) {
-        fetchedTotal.set(newStats.uniquejobs);
-        appliedTotal.set(newStats.appliedjobs);
-      }
-      const currentJobSite = get(jobSite);
-      jobSite.set(null);
-      jobSite.set(currentJobSite);
-
-      console.log('Listings refreshed and new job records loaded from database');
-    } catch (error) {
-      console.error('Error refreshing listings:', error);
-      jobhunter.showMessage(`Couldn't fetch job listings: ${error}`, 'Error');
-    } finally {
-      fetching.set(false);
+    async function searchJooble() {
+        if (!jobKeywords) {
+            await jobhunter.showMessage('Please enter job keywords', 'Error');
+            return;
+        }
+        fetching.set(true);
+        try {
+            await jobhunter.tauriCommand('run_search_engine', {
+                engine: 'jooble',
+                keywords: jobKeywords,
+                location: 'Italy' // TODO: make dynamic user input
+            });
+            await refreshJobListings();
+        } catch (error) {
+            console.error('Error searching Jooble:', error);
+            await jobhunter.showMessage(`Couldn't fetch Jooble listings: ${error}`, 'Error');
+        } finally {
+            fetching.set(false);
+        }
     }
-  }
-}
+
+    async function searchIndeed() {
+        if (!jobKeywords) {
+            await jobhunter.showMessage('Please enter job keywords', 'Error');
+            return;
+        }
+        fetching.set(true);
+        try {
+            await jobhunter.tauriCommand('run_search_engine', {
+                engine: 'indeed',
+                keywords: jobKeywords,
+                location: 'Italy' // TODO: Make dynamic user input
+            });
+            await refreshJobListings();
+        } catch (error) {
+            console.error('Error searching Indeed:', error);
+            await jobhunter.showMessage(`Couldn't fetch Indeed listings: ${error}`, 'Error');
+        } finally {
+            fetching.set(false);
+        }
+    }
+
+    async function refreshJobListings() {
+        try {
+            const newJobs = await jobhunter.tauriCommand('get_unread_jobs') as Job[];
+            allJobs.update(jobs => {
+                const existingJobIds = new Set(jobs.map(job => job.id));
+                const uniqueNewJobs = newJobs.filter(job => !existingJobIds.has(job.id));
+                return [...jobs, ...uniqueNewJobs];
+            });
+
+            const newStats = await jobhunter.tauriCommand('get_stats') as Stats;
+            if (newStats) {
+                fetchedTotal.set(newStats.uniquejobs);
+                appliedTotal.set(newStats.appliedjobs);
+            }
+            const currentJobSite = get(jobSite);
+            jobSite.set(null);
+            jobSite.set(currentJobSite);
+
+            console.log('New job records loaded from database');
+        } catch (error) {
+            console.error('Error refreshing job listings:', error);
+            await jobhunter.showMessage(`Couldn't refresh job listings: ${error}`, 'Error');
+        }
+    }
 
 async function makeJobApplication() {
     try {
@@ -237,14 +273,31 @@ async function makeJobApplication() {
 			>
 				<Jooble jobs={$allJobs} on:loadNewJobs={fromHere} />
 			</div>
-			<!-- Add the Refresh Job Listings button here -->
-  <button
-  class="mt-4 w-full bg-slate-500 hover:bg-slate-700 dark:text-white font-bold py-2 px-4 rounded"
-  on:click={refreshListings}
-  disabled={$fetching}
->
-  {$fetching ? 'Refreshing...' : 'Update Job Listings'}
-</button>
+			<!-- Add the job keywords input box -->
+            <input
+            type="text"
+            bind:value={jobKeywords}
+            placeholder="Enter job keywords"
+            class="mt-4 w-full px-4 py-2 border rounded"
+        />
+
+        <!-- Add the Search Jooble button -->
+        <button
+            class="mt-2 w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            on:click={searchJooble}
+            disabled={$fetching}
+        >
+            {$fetching ? 'Searching...' : 'Search Jooble'}
+        </button>
+
+        <!-- Add the Search Indeed button -->
+        <button
+            class="mt-2 w-full bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded"
+            on:click={searchIndeed}
+            disabled={$fetching}
+        >
+            {$fetching ? 'Searching...' : 'Search Indeed'}
+        </button>
 		</div>
 	</div>
 

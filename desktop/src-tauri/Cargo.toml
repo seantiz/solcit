@@ -15,7 +15,7 @@ rust-version = "1.60"
 tauri-build = { version = "1.5.5", features = [] }
 
 [dependencies]
-tauri = { version = "1.7.2", features = [ "dialog-all", "window-all", "shell-open", "path-all", "fs-all", "http-all"] }
+tauri = { version = "1.7.2", features = [ "shell-sidecar", "shell-execute", "dialog-all", "window-all", "shell-open", "path-all", "fs-all", "http-all"] }
 tauri-plugin-window-state = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 window-shadows = "0.2.1"
 rusqlite = { version = "0.29.0", features = ["bundled"] }

@@ -25,21 +25,24 @@
       "scope": ["http://localhost:8080/*", "http://127.0.0.1:8080/*", "http://localhost:11434/*"]
     },
     "fs": {
-      "all": true,
-      "readFile": true,
-      "writeFile": true,
-      "readDir": true,
-      "copyFile": true,
-      "createDir": true,
-      "removeDir": true,
-      "removeFile": true,
-      "renameFile": true,
-      "exists": true,
-      "scope": ["/**"]
-    },
+        "all": true,
+        "readFile": true,
+        "writeFile": true,
+        "readDir": true,
+        "copyFile": true,
+        "createDir": true,
+        "removeDir": true,
+        "removeFile": true,
+        "renameFile": true,
+        "exists": true,
+        "scope": ["**"]
+      },
     "shell": {
-          "open": true
-        },
+        "all": false,
+        "execute": true,
+        "sidecar": true,
+        "open": true
+      },
     "window": {
         "all": true
       }
