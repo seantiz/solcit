@@ -10,15 +10,15 @@ mod jobsearch;
 use tauri::Manager;
 use rusqlite::Connection;
 use std::fs::{self, File};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use window_shadows::set_shadow;
 use simplelog::{LevelFilter, CombinedLogger, Config, TermLogger, WriteLogger, TerminalMode};
 
+use helpers::get_db_path;
 use llm::{set_key, get_key, suggestions, extract_cv};
-use jobsearch::{find_indeed_listings, run_jooble_search};
+use jobsearch::{run_indeed_search, run_jooble_search};
 use server::{start_api_server, get_unread_jobs, update_job, get_stats};
 use appconfig::{initialise_config, read_config, write_config, write_job_description, read_job_description, read_applicant_details, write_applicant_details};
-use helpers::{get_db_path, get_log_file_path};
 
 fn main() {
     let log_file = get_log_file_path();
@@ -64,7 +64,7 @@ fn main() {
             Ok::<(), Box<dyn std::error::Error>>(())
         })
         .invoke_handler(tauri::generate_handler![
-            find_indeed_listings,
+            run_indeed_search,
             run_jooble_search,
             write_job_description,
             read_job_description,
@@ -105,4 +105,20 @@ fn copy_database(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+fn get_log_file_path() -> PathBuf {
+    if cfg!(target_os = "macos") {
+        // Prod (macOS): ~/Library/Logs/<AppName>/
+        home::home_dir()
+            .expect("Failed to get home directory")
+            .join("Library/Logs/Solicit/app.log")
+    } else {
+        // Prod (Windows, Linux): the current executable's directory
+        std::env::current_exe()
+            .expect("Failed to get current exe path")
+            .parent()
+            .expect("Failed to get parent directory")
+            .join("app.log")
+    }
 }

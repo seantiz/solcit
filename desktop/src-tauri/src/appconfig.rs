@@ -32,7 +32,6 @@ pub fn initialise_config(app_handle: AppHandle) -> Result<(), String> {
     for (file_name, initial_content) in files {
         let file_path = app_dir.join(file_name);
         if !file_path.exists() {
-            info!("Creating first user config files: {:?}", file_path);
             let content = serde_json::to_string_pretty(&initial_content)
                 .map_err(|e| {
                     error!("Failed to serialize JSON for {}: {}", file_name, e);

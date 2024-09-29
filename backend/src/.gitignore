@@ -1,0 +1,4 @@
+.env
+*.sqlite
+*.py
+startrequirements.txt

@@ -1,63 +1,53 @@
-use crate::helpers::{get_system_resource_path, get_db_path};
+use crate::helpers::get_db_path;
 use std::process::Command;
 use log::{info, error};
 use tauri::AppHandle;
-use tauri::Manager;
 use tokio::task;
 
 #[tauri::command]
-pub async fn find_indeed_listings(app_handle: AppHandle, keywords: String, location: String) -> Result<(), String> {
+pub async fn run_indeed_search(app_handle: AppHandle, keywords: String, location: String) -> Result<String, String> {
+
     let db_path = get_db_path(&app_handle);
-    let find_listings = get_system_resource_path(&app_handle, "search_engine_indeed.py");
+    let indeed_executable = app_handle
+        .path_resolver()
+        .resolve_resource("resources/indeedsearchengine")
+        .expect("Failed to resolve Indeed search engine executable path");
+    info!("Indeed executable path: {:?}", indeed_executable);
 
-    let output = std::process::Command::new("python3")
-        .arg(&find_listings)
-        .arg(db_path.to_str().unwrap())
-        .arg(&keywords)
-        .arg(&location)
-        .output()
-        .map_err(|e| e.to_string())?;
+    let result = task::spawn_blocking(move || {
+        info!("Executing Indeed search engine...");
+        let output = Command::new(&indeed_executable)
+            .arg(db_path.to_str().unwrap())
+            .arg(&keywords)
+            .arg(&location)
+            .output()
+            .map_err(|e| {
+                let error_msg = format!("Failed to execute Indeed search engine: {}", e);
+                error!("{}", error_msg);
+                error_msg
+            })?;
 
-    if output.status.success() {
-        println!("Python script executed successfully");
-        Ok(())
-    } else {
-        let error = String::from_utf8_lossy(&output.stderr);
-        eprintln!("Python script failed: {}", error);
-        Err(error.into_owned())
-    }
-}
+        if !output.status.success() {
+            let error_msg = format!("Indeed search engine execution failed. Exit code: {:?}\nStderr: {}",
+                output.status.code(),
+                String::from_utf8_lossy(&output.stderr));
+            error!("{}", error_msg);
+            return Err(error_msg);
+        }
 
-#[tauri::command]
-pub async fn find_jooble_listings(app_handle: AppHandle, keywords: String, location: String) -> Result<(), String> {
-    let db_path = get_db_path(&app_handle);
-    let find_listings = get_system_resource_path(&app_handle, "search_engine_jooble.py");
+        let success_msg = format!("Indeed search completed successfully. Stdout: {}",
+            String::from_utf8_lossy(&output.stdout));
+        info!("{}", success_msg);
+        Ok(success_msg)
+    }).await.map_err(|e| format!("Task join error: {}", e))?;
 
-    let output = std::process::Command::new("python3")
-        .arg(&find_listings)
-        .arg(db_path.to_str().unwrap())
-        .arg(&keywords)
-        .arg(&location)
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    if output.status.success() {
-        println!("Python script executed successfully");
-        Ok(())
-    } else {
-        let error = String::from_utf8_lossy(&output.stderr);
-        eprintln!("Python script failed: {}", error);
-        Err(error.into_owned())
-    }
+    result
 }
 
 #[tauri::command]
 pub async fn run_jooble_search(app_handle: AppHandle, keywords: String, location: String) -> Result<String, String> {
-    info!("Starting Jooble search with keywords: '{}', location: '{}'", keywords, location);
 
     let db_path = get_db_path(&app_handle);
-    info!("Database path: {:?}", db_path);
-
     let jooble_executable = app_handle
         .path_resolver()
         .resolve_resource("resources/joobsearchengine")

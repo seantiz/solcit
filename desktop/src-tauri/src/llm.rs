@@ -1,10 +1,10 @@
 use crate::schemas::ParsedDetails;
-use crate::helpers::get_credentials_file_path;
+
 use reqwest::Client;
 use serde_json::{json, Value};
+use std::path::PathBuf;
 use tauri::AppHandle;
 use std::fs;
-use log::info;
 
 #[tauri::command]
 pub fn get_key(app_handle: AppHandle) -> Result<String, String> {
@@ -15,10 +15,10 @@ pub fn get_key(app_handle: AppHandle) -> Result<String, String> {
     }
 
     let contents = fs::read_to_string(file_path)
-        .map_err(|e| format!("Failed to read credentials file: {}", e))?;
+        .map_err(|_e| format!("Failed to read credentials file"))?;
 
     let json: Value = serde_json::from_str(&contents)
-        .map_err(|e| format!("Failed to parse credentials JSON: {}", e))?;
+        .map_err(|_e| format!("Failed to parse credentials JSON"))?;
 
     Ok(json["anthropic_api_key"].as_str().unwrap_or("").to_string())
 }
@@ -37,10 +37,7 @@ pub fn set_key(app_handle: AppHandle, key: String) -> Result<(), String> {
     });
 
     fs::write(file_path.clone(), serde_json::to_string_pretty(&json).unwrap())
-        .map_err(|e| format!("Failed to write credentials file: {}", e))?;
-
-    info!("Credentials file successfully written to: {}", file_path.display());
-
+        .map_err(|_e| format!("Failed to write credentials file"))?;
     Ok(())
 }
 
@@ -114,4 +111,12 @@ pub async fn extract_cv(app_handle: AppHandle, preprocessed_text: String) -> Res
     };
 
     Ok(frontend_result)
+}
+
+fn get_credentials_file_path(app_handle: &AppHandle) -> PathBuf {
+    // Helper function
+    app_handle.path_resolver()
+        .app_data_dir()
+        .unwrap()
+        .join("credentials.json")
 }
