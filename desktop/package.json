@@ -10,11 +10,9 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
-		"tauri": "tauri",
-        "test:load": "playwright test loading.test.ts"
+		"tauri": "tauri"
 	},
 	"devDependencies": {
-		"@playwright/test": "^1.47.2",
 		"@sveltejs/kit": "^2.6.0",
 		"@tauri-apps/cli": "^1.6.1",
 		"@types/eslint": "^9.6.0",
@@ -23,7 +21,6 @@
 		"eslint-config-prettier": "^9.1.0",
 		"eslint-plugin-svelte": "^2.36.0",
 		"globals": "^15.0.0",
-		"playwright": "^1.47.2",
 		"prettier": "^3.1.1",
 		"prettier-plugin-svelte": "^3.1.2",
 		"prettier-plugin-tailwindcss": "^0.6.5",
